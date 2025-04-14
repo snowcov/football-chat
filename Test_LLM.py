@@ -1,6 +1,6 @@
 from langchain_community.document_loaders.csv_loader import CSVLoader
 from pathlib import Path
-from langchain_openai import ChatOpenAI,OpenAIEmbeddings
+from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 import os
 from dotenv import load_dotenv
 import pandas as pd
@@ -10,6 +10,7 @@ from langchain_community.vectorstores import FAISS
 from langchain_core.prompts import ChatPromptTemplate
 from langchain.chains import create_retrieval_chain
 from langchain.chains.combine_documents import create_stuff_documents_chain
+from langchain_core.documents import Document
 
 # Load environment variables from a .env file
 load_dotenv()
@@ -19,35 +20,35 @@ os.environ["OPENAI_API_KEY"] = os.getenv('OPENAI_API_KEY')
 
 llm = ChatOpenAI(model="gpt-3.5-turbo-0125")
 
-file_path = ('./data/sportsref.csv') # insert the path of the csv file
+file_path = ('./data/sportsref.csv')  # Insert the path of the CSV file
 data = pd.read_csv(file_path)
 
-#preview the csv file
-data.head()
+# Check if required columns exist
+required_columns = ['Player', 'Team', 'Fantasy Points', 'Fantasy Position']
+for col in required_columns:
+    if col not in data.columns:
+        raise KeyError(f"Missing required column in CSV: {col}")
 
-loader = CSVLoader(file_path=file_path)
-docs = loader.load_and_split()
+# Convert the CSV data into a list of Document objects
+docs = []
+for _, row in data.iterrows():
+    text = (
+        f"Player: {row['Player']}\n"
+        f"Team: {row['Team']}\n"
+        f"Fantasy Points: {row['Fantasy Points']}\n"
+        f"Position: {row['Fantasy Position']}"
+    )
+    docs.append(Document(page_content=text))
 
 embeddings = OpenAIEmbeddings()
-index = faiss.IndexFlatL2(len(OpenAIEmbeddings().embed_query(" ")))
-vector_store = FAISS(
-    embedding_function=OpenAIEmbeddings(),
-    index=index,
-    docstore=InMemoryDocstore(),
-    index_to_docstore_id={}
-)
-
-vector_store.add_documents(documents=docs)
+vector_store = FAISS.from_documents(docs, embeddings)
 
 retriever = vector_store.as_retriever()
 
 # Set up system prompt
 system_prompt = (
-    "You are an assistant for question-answering tasks. "
-    "Use the following pieces of retrieved context to answer "
-    "the question. If you don't know the answer, say that you "
-    "don't know. Use three sentences maximum and keep the "
-    "answer concise."
+    "You are a sports statistics assistant. Use the following data context to answer fantasy sports-related questions. "
+    "Answer concisely in 2-3 sentences, and only refer to data from the table if available."
     "\n\n"
     "{context}"
 )
@@ -55,12 +56,11 @@ system_prompt = (
 prompt = ChatPromptTemplate.from_messages([
     ("system", system_prompt),
     ("human", "{input}"),
-    
 ])
 
 # Create the question-answer chain
 question_answer_chain = create_stuff_documents_chain(llm, prompt)
 rag_chain = create_retrieval_chain(retriever, question_answer_chain)
 
-answer= rag_chain.invoke({"input": "Who scored the most fantasy points this season?"})
+answer = rag_chain.invoke({"input": "Who scored the most fantasy points this season?"})
 print(answer['answer'])
