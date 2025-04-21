@@ -8,6 +8,17 @@ df = pd.read_csv('./data/sportsref.csv')
 # Normalize column names
 df.columns = df.columns.str.strip()
 
+# Define relevant stat columns (customize as needed)
+relevant_columns = [
+    'Fantasy Rank', 'Player', 'Team', 'Fantasy Position', 'Fantasy Points',
+    'Passing Yards', 'Passing TD', 'Rushing Yards', 'Rushing TD',
+    'Receiving Yards', 'Receiving TD'
+]
+
+# Filter only relevant columns that exist in the dataset
+relevant_columns = [col for col in relevant_columns if col in df.columns]
+df = df[relevant_columns]
+
 # Function to extract relevant data based on keywords
 def get_relevant_data(query: str):
     query = query.lower()
@@ -22,30 +33,35 @@ def get_relevant_data(query: str):
     else:
         pos = None
 
-    # Determine sorting
-    if "most passing yards" in query:
-        data = df[df['Fantasy Position'] == 'QB']
-        return data.sort_values(by='Passing Yards', ascending=False).head(5).to_dict(orient='records')
-
+    # Filter by position
+    data = df.copy()
     if pos:
-        data = df[df['Fantasy Position'] == pos]
-        if "top" in query or "best" in query:
-            return data.sort_values(by='Fantasy Points', ascending=False).head(5).to_dict(orient='records')
-        return data.head(10).to_dict(orient='records')
+        data = data[data['Fantasy Position'] == pos]
 
-    return df.sort_values(by='Fantasy Points', ascending=False).head(10).to_dict(orient='records')
+    # Determine sorting
+    if "most passing yards" in query and 'Passing Yards' in data.columns:
+        data = data.sort_values(by='Passing Yards', ascending=False).head(5)
+    elif "top" in query or "best" in query:
+        data = data.sort_values(by='Fantasy Points', ascending=False).head(5)
+    else:
+        data = data.head(10)
+
+    return data.dropna().to_dict(orient='records')
 
 # Ask Mistral a question with selected stats
 def ask_model(question: str):
     data = get_relevant_data(question)
+    if not data:
+        return "No relevant stats found to answer this question."
+
     system_prompt = (
-        "You are a fantasy football expert. You are provided with player stats in JSON format. "
-        "Use these to answer user questions about player performance, rankings, and comparisons."
+        "You are a fantasy football analyst. You MUST answer ONLY using the statistics provided in the JSON below. "
+        "Do not guess or use outside knowledge. If the answer cannot be found in the stats, say 'I don't have that information.'"
     )
 
     user_prompt = f"""
 Question: {question}
-Stats: {json.dumps(data, indent=2)}
+Stats (ONLY use these to answer): {json.dumps(data, indent=2)}
 Answer:"""
 
     try:
@@ -65,4 +81,4 @@ if __name__ == "__main__":
         if user_input.lower() in ['exit', 'quit']:
             break
         answer = ask_model(user_input)
-        print(f"\n🧠 {answer}")
+        print(f"\nAnswer: {answer}")
