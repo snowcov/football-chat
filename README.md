@@ -2,8 +2,10 @@
 
 ## Domain-Based LLM using RAG
 
-# Download Required Libraries:
-> conda create -n fantasy-llm python=3.9  
-> conda activate fantasy-llm  
-> pip install -r requirements.txt
+### Download Required Libraries:
+```bash
+conda create -n fantasy-llm python=3.9
+conda activate fantasy-llm
+pip install -r requirements.txt
+```
 
