@@ -3,11 +3,11 @@ transformers==4.30.2
 tokenizers==0.13.3
 datasets==2.13.0
 tqdm==4.65.0
-langchain-community==0.0.8
-langchain-openai==0.0.8
-langchain-core==0.0.8
+langchain-community
+langchain-openai
+langchain-core
 python-dotenv==1.0.0
-pandas==1.5.3
+pandas
 faiss-cpu==1.7.4
 ollama==0.4.8  
 jsonschema==4.17.3
