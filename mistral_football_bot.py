@@ -4,6 +4,7 @@ import json
 import os
 import re
 from data_loader import load_and_process_data
+import difflib
 
 # Load and process all relevant CSV data
 combined_df = load_and_process_data('./data')
@@ -62,25 +63,28 @@ def get_relevant_data(query: str):
             most_recent = combined_df['Year'].dropna().max()
             data = combined_df[combined_df['Year'] == most_recent]
 
-    # 4. Player name matching (partial)
+    # 4. Player name matching (improved fuzzy match)
     player_matches = []
     if 'Player' in data.columns:
         for player in data['Player'].dropna().unique():
-            if player and player.lower() in query:
+            if player and difflib.get_close_matches(player.lower(), [query], n=1, cutoff=0.7):
+                player_matches.append(player)
+            elif player and player.lower() in query:
                 player_matches.append(player)
         if player_matches:
             data = data[data['Player'].isin(player_matches)]
             if not data.empty:
                 return data.dropna().to_dict(orient='records')
 
+
     # 5. Sorting logic for "top", "best", "pick up", or position queries
     if (any(word in query for word in ["top", "best", "pick up", "rb", "running back", "wr", "wide receiver", "qb", "quarterback"])
         and 'Fantasy Points' in data.columns):
         data = data.sort_values(by='Fantasy Points', ascending=False)
-        data = data.drop_duplicates(subset=['Player'], keep='first').head(5)
+        data = data.drop_duplicates(subset=['Player'], keep='first').head(10)
     elif "most passing yards" in query and 'Passing Yards' in data.columns:
         data = data.sort_values(by='Passing Yards', ascending=False)
-        data = data.drop_duplicates(subset=['Player'], keep='first').head(5)
+        data = data.drop_duplicates(subset=['Player'], keep='first').head(10)
     elif 'Fantasy Points' in data.columns:
         data = data.sort_values(by='Fantasy Points', ascending=False)
         data = data.drop_duplicates(subset=['Player'], keep='first').head(10)
